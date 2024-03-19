@@ -1,6 +1,8 @@
 'use strict';
-
-const { Board } = require('../models');
+const express = require('express');
+const app = express();
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
 
 const BoardModel = require('../models').Board;
 const ThreadModel = require('../models').Thread;
@@ -137,8 +139,9 @@ module.exports = function (app) {
                             res.status(500).send("Error updating data");
                         }); 
     });
-
+    
     app.route('/api/replies/:board').post((req, res) => {
+        console.log("1");
         console.log("thread", req.body);
         const { thread_id, text, delete_password } = req.body;
         const board = req.params.board;
@@ -157,7 +160,7 @@ module.exports = function (app) {
                     threadToAddReply.replies.push(newReply);
                     boardData.save()
                         .then(updatedData => {
-                            res.json(updatedData);
+                            res.json(updatedData.threads.id(thread_id));
                         });
                 }
             })
@@ -171,8 +174,8 @@ module.exports = function (app) {
                     res.status(404).send("Board not found");
                     res.json({ error: "No board with this name"});
                 } else {
-                    console.log("data", data);
-                    const thread = data.threads.id(req.query.thread_id);
+                    console.log("data", boardData);
+                    const thread = boardData.threads.id(req.query.thread_id);
                     res.json(thread);
                 }
                 });
@@ -186,12 +189,12 @@ module.exports = function (app) {
                 if ( !boardData) {
                     res.status(404).send("Board not found");
                 } else {
-                    console.log("data", data);
-                    let thread = data.threads.id(thread_id);
+                    console.log("data", boardData);
+                    let thread = boardData.threads.id(thread_id);
                     let reply = thread.replies.id(reply_id);
                     reply.reported = true;
                     reply.bumped_on = new Date();
-                    data.save()
+                    boardData.save()
                         .then(updatedData => {
                             res.send("Success");
                         });
@@ -208,8 +211,8 @@ module.exports = function (app) {
                 if ( !boardData) {
                     res.status(404).send("Board not found");
                 } else {
-                    console.log("data", data);
-                    let thread = data.threads.id(thread_id);
+                    console.log("data", boardData);
+                    let thread = boardData.threads.id(thread_id);
                     let reply = thread.replies.id(reply_id);
                     if (reply.delete_password === delete_password) {
                         thread.replies.pull(reply_id);
@@ -217,13 +220,11 @@ module.exports = function (app) {
                         res.send("Incorrect password");
                         return;
                     }
-                    data.save()
+                    boardData.save()
                         .then(updatedData => {
                             res.send("Success");
                         });
                 }
                 });
             });
-   
-    app.route('/api/replies/:board/:thread')
 };

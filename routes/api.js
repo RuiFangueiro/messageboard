@@ -138,7 +138,92 @@ module.exports = function (app) {
                         }); 
     });
 
-    app.route('/api/replies/:board')
-
+    app.route('/api/replies/:board').post((req, res) => {
+        console.log("thread", req.body);
+        const { thread_id, text, delete_password } = req.body;
+        const board = req.params.board;
+        const newReply = new ReplyModel({
+            text: text,
+            delete_password: delete_password
+        });
+        BoardModel.findOne({ name: board })
+            .then(boardData => {
+                if (!boardData) {
+                    res.status(404).send("Board not found");
+                } else {
+                    const date = new Date();
+                    let threadToAddReply = boardData.threads.id(thread_id);
+                    threadToAddReply.bumped_on = date;
+                    threadToAddReply.replies.push(newReply);
+                    boardData.save()
+                        .then(updatedData => {
+                            res.json(updatedData);
+                        });
+                }
+            })
+        });
+        
+    app.route('/api/replies/:board').get((req, res) => {
+        const board = req.params.board;
+        BoardModel.findOne( { name: board })
+            .then(boardData => {
+                if (!boardData) {
+                    res.status(404).send("Board not found");
+                    res.json({ error: "No board with this name"});
+                } else {
+                    console.log("data", data);
+                    const thread = data.threads.id(req.query.thread_id);
+                    res.json(thread);
+                }
+                });
+            });
+    
+    app.route('/api/replies/:board').put((req, res) => {
+        const {thread_id, reply_id } = req.body;
+        const board = req.params.board;
+        BoardModel.findOne( { name: board })
+            .then(boardData => {
+                if ( !boardData) {
+                    res.status(404).send("Board not found");
+                } else {
+                    console.log("data", data);
+                    let thread = data.threads.id(thread_id);
+                    let reply = thread.replies.id(reply_id);
+                    reply.reported = true;
+                    reply.bumped_on = new Date();
+                    data.save()
+                        .then(updatedData => {
+                            res.send("Success");
+                        });
+                }
+                });
+            });
+    
+    app.route('/api/replies/:board').delete((req, res) => {
+        const { thread_id, reply_id, delete_password } = req.body;
+        console.log("delete reply body", req.body);
+        const board = req.params.board;
+        BoardModel.findOne( { name: board })
+            .then(boardData => {
+                if ( !boardData) {
+                    res.status(404).send("Board not found");
+                } else {
+                    console.log("data", data);
+                    let thread = data.threads.id(thread_id);
+                    let reply = thread.replies.id(reply_id);
+                    if (reply.delete_password === delete_password) {
+                        thread.replies.pull(reply_id);
+                    } else {
+                        res.send("Incorrect password");
+                        return;
+                    }
+                    data.save()
+                        .then(updatedData => {
+                            res.send("Success");
+                        });
+                }
+                });
+            });
+   
     app.route('/api/replies/:board/:thread')
 };

@@ -3,6 +3,7 @@ require('dotenv').config();
 const express     = require('express');
 const bodyParser  = require('body-parser');
 const cors        = require('cors');
+const helmet      = require('helmet');
 
 const apiRoutes         = require('./routes/api.js');
 const fccTestingRoutes  = require('./routes/fcctesting.js');
@@ -10,6 +11,12 @@ const runner            = require('./test-runner');
 require('./db-connection.js'); //Establish connection to the database
 
 const app = express();
+
+app.use(helmet.frameguard({ action: 'same-origin'}));
+app.use(helmet.dnsPrefetchControl({ allow: false}));
+app.use(helmet.referrerPolicy({ policy: 'same-origin' }));
+
+// Serve static files from the public directory
 
 app.use('/public', express.static(process.cwd() + '/public'));
 

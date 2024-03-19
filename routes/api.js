@@ -80,4 +80,65 @@ module.exports = function (app) {
             res.status(500).send("Error finding board");
         });
     });
+
+    app.route('/api/threads/:board').put((req, res) => {
+        console.log("put", req.body);
+        const { report_id } = req.body;
+        const board = req.params.board;
+        BoardModel.findOne({ name: board })
+            .then(boardData => {
+                if (!boardData) {
+                    res.status(404).send("Board not found");
+                } else {
+                    const date = new Date();
+                    let reportedThread = boardData.threads.id(report_id);
+                    reportedThread.reported = true;
+                    reportedThread.bumped_on = date;
+                    boardData.save()
+                        .then(updatedData => {
+                            res.send("Success");
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            res.status(500).send("Error updating data");
+                        });
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                res.status(500).send("Error finding board");
+            });
+    });
+
+    app.route('/api/threads/:board').delete((req, res) => {
+        console.log("delete", req.body);
+        const { thread_id, delete_password } = req.body;
+        const board = req.params.board;
+        BoardModel.findOne({ name: board })
+            .then(boardData => {
+                if (!boardData) {
+                    res.status(404).send("Board not found");
+                } else {
+                    let threadToDelete = boardData.threads.id(thread_id);
+                    if (threadToDelete.delete_password === delete_password) {
+                        boardData.threads.pull(thread_id);
+                    } else {
+                        res.send("Incorrect password");
+                        return;
+                    }
+                    boardData.save()
+                        .then(updatedData => {
+                            res.send("Success");
+                        });
+                    }
+                })
+                        .catch(err => {
+                            console.log(err);
+                            res.status(500).send("Error updating data");
+                        }); 
+    });
+
+    app.route('/api/replies/:board')
+
+    app.route('/api/replies/:board/:thread')
 };

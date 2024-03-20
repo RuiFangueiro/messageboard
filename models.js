@@ -24,7 +24,10 @@ const Thread = mongoose.model('Thread', ThreadSchema);
 
 const BoardSchema = new Schema({
     name: { type: String },
-    threads: [ThreadSchema]
+    threads: [ThreadSchema],
+    reported: { type: Boolean, default: false },
+    created_on: { type: Date, default: date }, 
+    bumped_on: { type: Date, default: date }
 });
 const Board = mongoose.model('Board', BoardSchema); 
 

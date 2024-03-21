@@ -80,16 +80,42 @@ module.exports = function (app) {
                 res.status(404).send("Board not found");
             } else {
                 const threads = boardData.threads.slice(0, 10).map(thread => {
-                    return {
-                        _id: thread._id,
-                        text: thread.text,
-                        created_on: thread.created_on,
-                        bumped_on: thread.bumped_on,
-                        replies: thread.replies,
-                        replycount: thread.replies.length
-                    };
+                    const { delete_password, ...threadWithoutPassword } = thread;
+                        return {
+                            ...threadWithoutPassword,
+                            _id: thread._id,
+                            text: thread.text,
+                            delete_password: null,
+                            created_on: thread.created_on,
+                            bumped_on: thread.bumped_on,
+                            replies: thread.replies.slice(0, 3).map(reply => {
+                                const { delete_password, ...replyWithoutPassword } = reply;
+                                return {
+                                    ...replyWithoutPassword,
+                                    _id: reply._id,
+                                    text: reply.text,
+                                    delete_password: null,
+                                    created_on: reply.created_on,
+                                    delete_password: reply.delete_password
+                                };
+                            }),
+                            replycount: thread.replies.length
+                        };
                 });
-                res.json(threads);
+                
+                const cleanedThreads = threads.map(thread => ({
+                    _id: thread._id,
+                    text: thread.text,
+                    created_on: thread.created_on,
+                    bumped_on: thread.bumped_on,
+                    replies: thread.replies.map(reply => ({
+                        _id: reply._id,
+                        text: reply.text,
+                        created_on: reply.created_on
+                    })),
+                    replycount: thread.replycount
+                }));
+                res.json(cleanedThreads);
             }
         })
         .catch(err => {
@@ -221,23 +247,43 @@ module.exports = function (app) {
 
     app.route('/api/replies/:board').get((req, res) => {
         const board = req.params.board;
-        BoardModel.findOne( { name: board })
+        BoardModel.findOne({ name: board })
             .populate({
                 path: 'threads',
                 match: { _id: req.query.thread_id },
-                populate: { path:'replies', select: '-reported -delete_password'}
+                populate: { path: 'replies', select: '-reported -delete_password' }
             })
             .then(boardData => {
                 if (!boardData) {
-                    res.status(404).send("Board not found");
-                    res.json({ error: "No board with this name"});
-                } else {
-                    console.log("data", boardData);
-                    const thread = boardData.threads.id(req.query.thread_id);
-                    res.json(thread);
+                    return res.status(404).json({ error: "No board with this name" });
                 }
-                });
+    
+                const thread = boardData.threads[0]; // Assuming there's only one thread
+                if (!thread) {
+                    return res.status(404).json({ error: "No thread with this ID" });
+                }
+    
+                const cleanedReplies = {
+                    _id: thread._id,
+                    text: thread.text,
+                    created_on: thread.created_on,
+                    bumped_on: thread.bumped_on,
+                    replies: thread.replies.map(reply => ({
+                        _id: reply._id,
+                        text: reply.text,
+                        created_on: reply.created_on
+                    })),
+                    replycount: thread.replies.length
+                };
+    
+                res.json(cleanedReplies);
+            })
+            .catch(err => {
+                console.log(err);
+                res.status(500).send("Error finding board");
             });
+    });
+    
     
     app.route('/api/replies/:board').put((req, res) => {
         const {thread_id, reply_id } = req.body;

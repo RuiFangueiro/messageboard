@@ -12,20 +12,22 @@ module.exports = function (app) {
     app.route('/api/threads/:board').post((req, res) => {
         const { text, delete_password } = req.body;
         const board = req.params.board;
-    
-        // Create a new Date object to represent the current date & time
+
         const currentDate = new Date();
-    
-        const newThread = new ThreadModel({
-            text: text,
-            delete_password: delete_password,
-            created_on: currentDate, // Set created_on to the current date & time
-            bumped_on: currentDate, // Set bumped_on to the current date & time
-            reported: false, // Initially set reported to false
-            replies: [] // Initialize replies array as empty
-        });
-    
-        BoardModel.findOne({ name: board })
+            
+            const newThread = new ThreadModel({
+                text: text,
+                delete_password: delete_password,
+                created_on: currentDate, // Set created_on to the current date & time
+                bumped_on: currentDate, // Set bumped_on to the current date & time
+                reported: false, // Initially set reported to false
+                replies: [] // Initialize replies array as empty
+            });
+            
+        saveThreadToDatabase(newThread);
+        
+        function saveThreadToDatabase(newThread) {
+          BoardModel.findOne({ name: board })
             .then(boardData => {
                 if (!boardData) {
                     // Create a new board if it doesn't exist
@@ -50,6 +52,7 @@ module.exports = function (app) {
                 console.error(err);
                 res.status(500).send("Error saving thread");
             });
+        }
     });
 
   app.route('/api/threads/:board').get((req, res) => {
@@ -71,6 +74,7 @@ module.exports = function (app) {
                 select: '-reported -delete_password' // Exclude reported and delete_password fields
             }
         })
+        .select('-reported -delete_password') // Exclude reported and delete_password fields
         .then(boardData => {
             if (!boardData) {
                 res.status(404).send("Board not found");
@@ -81,8 +85,6 @@ module.exports = function (app) {
                         text: thread.text,
                         created_on: thread.created_on,
                         bumped_on: thread.bumped_on,
-                        reported: thread.reported,
-                        delete_password: thread.delete_password,
                         replies: thread.replies,
                         replycount: thread.replies.length
                     };
@@ -196,7 +198,9 @@ module.exports = function (app) {
                 // Create a new reply
                 const newReply = new ReplyModel({
                     text: text,
-                    delete_password: delete_password
+                    delete_password: delete_password,
+                    created_on: new Date(),
+                    bumped_on: new Date()
                 });
     
                 // Update bumped_on date of the thread to the current date & time
@@ -204,13 +208,9 @@ module.exports = function (app) {
                 // Push the new reply to the thread's replies array
                 threadToAddReply.replies.push(newReply);
     
-                return boardData.save();
+                return boardData.save().then(() =>newReply);
             })
-            .then(updatedData => {
-                if (!updatedData) {
-                    throw new Error("Error saving reply");
-                }
-                // Respond with the newly added reply
+            .then(newReply => {
                 res.json(newReply);
             })
             .catch(err => {
@@ -222,6 +222,11 @@ module.exports = function (app) {
     app.route('/api/replies/:board').get((req, res) => {
         const board = req.params.board;
         BoardModel.findOne( { name: board })
+            .populate({
+                path: 'threads',
+                match: { _id: req.query.thread_id },
+                populate: { path:'replies', select: '-reported -delete_password'}
+            })
             .then(boardData => {
                 if (!boardData) {
                     res.status(404).send("Board not found");
